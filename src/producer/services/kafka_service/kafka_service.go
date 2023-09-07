@@ -15,7 +15,7 @@ type KafkaService struct {
 	Config *config.Config
 }
 
-func (k *KafkaService) CreateConnection() (w *kafka.Writer, err error) {
+func (k *KafkaService) CreateConnection() {
 	clientId := uuid.New().String()
 	dialer := &kafka.Dialer{
 		Timeout:  10 * time.Second,
@@ -32,7 +32,10 @@ func (k *KafkaService) CreateConnection() (w *kafka.Writer, err error) {
 		CompressionCodec: snappy.NewCompressionCodec(),
 		BatchSize:        k.Config.BatchSize / 4,
 	}
-	k.writer = kafka.NewWriter(config)
+	w := kafka.NewWriter(config)
+	if w != nil {
+		k.writer = w
+	}
 }
 
 func (k *KafkaService) Push(message kafka.Message, ctx context.Context) error {
