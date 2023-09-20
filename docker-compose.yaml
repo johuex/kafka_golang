@@ -1,0 +1,197 @@
+version: "3.9"
+
+services:
+  zookeeper_1:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2888
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: nc -z localhost 2888 || exit -1
+      start_period: 15s
+      interval: 5s
+      timeout: 10s
+      retries: 10
+  
+  zookeeper_2:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2888
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: nc -z localhost 2888 || exit -1
+      start_period: 15s
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  kafka_1:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      zookeeper_1:
+        condition: service_healthy
+    hostname: kafka
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper_1:2888,zookeeper_2:2888
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka_1:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://localhost:29092
+      BOOTSTRAP_SERVERS: kafka_1:9092,kafka_2:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+    healthcheck:
+      test: nc -z localhost 29092 || exit -1
+      interval: 5s
+      timeout: 10s
+      retries: 19
+      start_period: 15s # check without counting retries
+  
+  kafka_2:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      zookeeper_2:
+        condition: service_healthy
+    hostname: kafka
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper_1:2888,zookeeper_2:2888
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka_2:9092,PLAINTEXT_HOST://localhost:39092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://localhost:39092
+      BOOTSTRAP_SERVERS: kafka_1:9092,kafka_2:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+    healthcheck:
+      test: nc -z localhost 39092 || exit -1
+      interval: 5s
+      timeout: 10s
+      retries: 19
+      start_period: 15s # check without counting retries
+    
+    
+  init-kafka:
+    # init topic after kafka creating
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      kafka_1:
+        condition: service_healthy
+      kafka_2:
+        condition: service_healthy
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      kafka-topics --bootstrap-server kafka_1:9092 --list
+      echo -e 'Creating kafka topics'
+      kafka-topics --bootstrap-server kafka_1:9092 --create --if-not-exists --topic example_topic --replication-factor 2 --partitions 2
+
+      echo -e 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server kafka_1:9092 --list
+      "  
+  
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    ports:
+      - 8090:8080
+    restart: always
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka_1:9092,kafka_2:9092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2888
+    depends_on:
+      init-kafka:
+          condition: service_completed_successfully 
+    links: # used because depends without condition
+      - kafka_1
+      - kafka_2
+      - zookeeper_1
+      - zookeeper_2
+
+  postgres:
+    build:
+      context: docker
+      dockerfile: Dockerfile-db
+    environment:
+      - POSTGRES_USER=dev_user
+      - POSTGRES_PASSWORD=123456
+      - POSTGRES_DB_NAME=dev_test
+      - POSTGRES_SCHEMA_NAME=public
+    ports:
+      - "5432:5432"  # for debug
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  master:
+    build:
+      context: docker
+      dockerfile: Dockerfile
+    depends_on:
+      init-kafka:
+        condition: service_completed_successfully
+    env_file:
+      - ./.env
+    volumes:
+      - ./build/producer:/app
+      - ./.env:/app
+    ports:
+      - "3000:3000"
+
+  consumer_1:
+    build:
+      context: docker
+      dockerfile: Dockerfile
+    depends_on:
+      master:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ./.env
+    volumes:
+      - ./build/consumer:/app
+  
+  consumer_2:
+    build:
+      context: docker
+      dockerfile: Dockerfile
+    depends_on:
+      master:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ./.env
+    volumes:
+      - ./build/consumer:/app
+  
+  consumer_3:
+    build:
+      context: docker
+      dockerfile: Dockerfile
+    depends_on:
+      master:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ./.env
+    volumes:
+      - ./build/consumer:/app
+  
+  consumer_4:
+    build:
+      context: docker
+      dockerfile: Dockerfile
+    depends_on:
+      master:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ./.env
+    volumes:
+      - ./build/consumer:/app
