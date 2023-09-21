@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
 	"consumer/config"
 	"consumer/models"
@@ -21,17 +22,22 @@ type Service struct {
 
 func (s *Service) Consume(wg *sync.WaitGroup) {
 	r := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: []string{s.Config.BrokerUrl},
-		Topic:   s.Config.BrokerTopic,
-		GroupID: s.Config.GroupID,
-		Logger:  s.Logger,
+		Brokers:     []string{s.Config.BrokerUrl},
+		Topic:       s.Config.BrokerTopic,
+		GroupID:     s.Config.GroupID,
+		Logger:      s.Logger,
+		MinBytes:    s.Config.MinBatchSize,                               // min size of batch, each message size is 168 bytes
+		MaxBytes:    s.Config.MaxBatchSize,                               // max size of batch
+		MaxWait:     time.Duration(s.Config.MaxReaderWait) * time.Second, // max timeout to wait for read if not cross the min bytes
+		StartOffset: kafka.FirstOffset,                                   // fetch like queue
 	})
 	ctx := context.Background()
-	kafka_messages := make([]kafka.Message, 0, s.Config.BatchSize)
+
 	for {
+		kafka_messages := make([]kafka.Message, s.Config.BatchSize)
 		// read batch
 		for idx := range kafka_messages {
-			msg, err := r.ReadMessage(ctx) // block & wait for NewMessage
+			msg, err := r.FetchMessage(ctx) // block & wait for NewMessage
 			if err != nil {
 				s.Logger.Fatal("could not read message " + err.Error())
 			}
@@ -43,9 +49,16 @@ func (s *Service) Consume(wg *sync.WaitGroup) {
 		orms := s.convertToOrm(kafka_messages)
 
 		// write batch to repo
-		s.TransactionRepository.InsertTransactions(orms)
-
-		kafka_messages = kafka_messages[:0] // empty with keeping alocated memory
+		trans_result := s.TransactionRepository.InsertTransactions(orms)
+		for _, res := range trans_result {
+			if res.Error != nil {
+				s.Logger.Fatal("error while inserting to DB")
+			}
+		}
+		err := r.CommitMessages(ctx, kafka_messages...)
+		if err != nil {
+			s.Logger.Fatal("error while commiting kafka messages " + err.Error())
+		}
 	}
 }
 
@@ -55,7 +68,7 @@ func (s *Service) Consume(wg *sync.WaitGroup) {
 //}
 
 func (s *Service) convertToOrm(messages []kafka.Message) []repositories.TransactionDB {
-	db_models := make([]repositories.TransactionDB, 0, len(messages))
+	db_models := make([]repositories.TransactionDB, len(messages))
 
 	for idx, msg := range messages {
 		transaction := models.Transaction{}

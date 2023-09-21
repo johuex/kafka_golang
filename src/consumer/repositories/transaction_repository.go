@@ -25,8 +25,8 @@ type TransactionDB struct {
 	Accepted        bool
 }
 
-func (t *TransactionRepository) InsertTransactions(transactions []TransactionDB) *gorm.DB {
-	result := t.DBConn.Create(&transactions)
-	t.DBConn.Commit()
-	return result
+func (t *TransactionRepository) InsertTransactions(transactions []TransactionDB) []*gorm.DB {
+	insert_result := t.DBConn.Create(&transactions)
+	//commit_result := t.DBConn.Commit()
+	return []*gorm.DB{insert_result} //, commit_result}
 }

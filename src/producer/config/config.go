@@ -15,9 +15,9 @@ type Config struct {
 
 func New() *Config {
 	return &Config{
-		KafkaURL1:  getEnv("KAFKA_URL_1", ""),
-		KafkaURL2:  getEnv("KAFKA_URL_2", ""),
-		KafkaTopic: getEnv("KAFKA_TOPIC", ""),
+		KafkaURL1:  getEnv("KAFKA_URL_1", "localhost:29092"),
+		KafkaURL2:  getEnv("KAFKA_URL_2", "localhost:39093"),
+		KafkaTopic: getEnv("KAFKA_TOPIC", "example_topic"),
 		BatchSize:  getEnvInt("BATCH_SIZE_PRODUCER", 100000),
 		TotalSize:  getEnvInt("TOTAL_SIZE_PRODUCER", 10000000),
 	}

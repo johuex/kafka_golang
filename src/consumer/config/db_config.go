@@ -14,11 +14,11 @@ type DBConfig struct {
 func NewDBConfig() *DBConfig {
 	return &DBConfig{
 		Host:     getEnv("DB_HOST", "localhost"),
-		User:     getEnv("KAFKA_PORT", "dev_user"),
-		DBName:   getEnv("KAFKA_TOPIC", "default"),
-		Password: getEnv("KAFKA_GROUP", "123456"),
+		User:     getEnv("DB_USER", "dev_user"),
+		DBName:   getEnv("DB_NAME", "dev_test"),
+		Password: getEnv("DB_PASSWD", "123456"),
 		Port:     getEnvInt("DB_PORT", 5432),
-		SSLMode:  getEnv("DB_SSL", "disabled"),
+		SSLMode:  getEnv("DB_SSL", "disable"),
 	}
 }
 

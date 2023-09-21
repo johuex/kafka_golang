@@ -17,7 +17,7 @@ type Container struct {
 func init() {
 	config_ := config.New()
 	logger := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
-	kafkaService := kafka_service.KafkaService{}
+	kafkaService := kafka_service.KafkaService{Config: config_, Logger: logger}
 	service := app_service.Service{
 		Config: config_, Logger: logger, KafkaService: &kafkaService,
 	}

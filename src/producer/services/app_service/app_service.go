@@ -30,27 +30,32 @@ func (s *Service) Ping() []byte {
 
 func (s *Service) Kafka() {
 	var i int
-	for i = 0; i < s.Config.TotalSize; i++ {
-		messageKey := uuid.New().String()
+	for i = 0; i < s.Config.TotalSize/s.Config.BatchSize; i++ {
+		messages := make([]kafka.Message, s.Config.BatchSize)
+		for idx := range messages {
+			messageKey := uuid.New().String()
 
-		messageVal := models.Transaction{
-			TransactionType: models.TransactionType(rand.Intn(7)),
-			Location:        models.Locations[rand.Intn(7)],
-			TransactionId:   rand.Int63(),
-			AccountNumber:   rand.Int63(),
-			Amount:          rand.Intn(110000),
-			Time:            time.Now(),
+			messageVal := models.Transaction{
+				TransactionType: models.TransactionType(rand.Intn(7)),
+				Location:        models.Locations[rand.Intn(5)],
+				TransactionId:   rand.Int63(),
+				AccountNumber:   rand.Int63(),
+				Amount:          rand.Intn(110000),
+				Time:            time.Now(),
+			}
+			jsonVal, _ := json.Marshal(messageVal)
+			message := kafka.Message{
+				Key:   []byte(messageKey),
+				Value: jsonVal,
+			}
+			messages[idx] = message
 		}
-		jsonVal, _ := json.Marshal(messageVal)
-		message := kafka.Message{
-			Key:   []byte(messageKey),
-			Value: jsonVal,
-		}
-		err := s.KafkaService.Push(message, context.Background())
+
+		err := s.KafkaService.Push(messages, context.Background())
 		if err != nil {
 			s.Logger.Fatal("failed to write messages:", err)
 		}
 	}
 
-	s.Logger.Printf("Send to Kafka: %d messages", i)
+	s.Logger.Printf("Send to Kafka: %d batches with size %d", i, s.Config.BatchSize)
 }

@@ -34,11 +34,11 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper_1:2888,zookeeper_2:2888
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka_1:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://localhost:29092
-      BOOTSTRAP_SERVERS: kafka_1:9092,kafka_2:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka_1:9092,OUTSIDE://localhost:29092  # for client usage
+      KAFKA_LISTENERS: INSIDE://kafka_1:9092,OUTSIDE://localhost:29092  # for kafka usage
+      BOOTSTRAP_SERVERS: kafka_1:9092,kafka_2:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
     healthcheck:
       test: nc -z localhost 29092 || exit -1
@@ -46,6 +46,9 @@ services:
       timeout: 10s
       retries: 19
       start_period: 15s # check without counting retries
+    ports:
+      - '9092:9092'
+      - '29092:29092'
   
   kafka_2:
     image: confluentinc/cp-kafka:latest
@@ -56,18 +59,21 @@ services:
     environment:
       KAFKA_BROKER_ID: 2
       KAFKA_ZOOKEEPER_CONNECT: zookeeper_1:2888,zookeeper_2:2888
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka_2:9092,PLAINTEXT_HOST://localhost:39092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://localhost:39092
-      BOOTSTRAP_SERVERS: kafka_1:9092,kafka_2:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka_2:9093,OUTSIDE://localhost:39093
+      KAFKA_LISTENERS: INSIDE://kafka_2:9093,OUTSIDE://localhost:39093
+      BOOTSTRAP_SERVERS: kafka_1:9092,kafka_2:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
     healthcheck:
-      test: nc -z localhost 39092 || exit -1
+      test: nc -z localhost 39093 || exit -1
       interval: 5s
       timeout: 10s
       retries: 19
       start_period: 15s # check without counting retries
+    ports:
+      - '9093:9093'
+      - '39093:39093'
     
     
   init-kafka:
@@ -83,7 +89,7 @@ services:
       "
       kafka-topics --bootstrap-server kafka_1:9092 --list
       echo -e 'Creating kafka topics'
-      kafka-topics --bootstrap-server kafka_1:9092 --create --if-not-exists --topic example_topic --replication-factor 2 --partitions 2
+      kafka-topics --bootstrap-server kafka_1:9092 --create --if-not-exists --topic example_topic --replication-factor 1 --partitions 4
 
       echo -e 'Successfully created the following topics:'
       kafka-topics --bootstrap-server kafka_1:9092 --list
@@ -97,8 +103,8 @@ services:
     restart: always
     environment:
       - KAFKA_CLUSTERS_0_NAME=local
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka_1:9092,kafka_2:9092
-      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2888
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka_1:9092,kafka_2:9093
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper_1:2888,zookeeper_2:2888
     depends_on:
       init-kafka:
           condition: service_completed_successfully 
@@ -118,12 +124,23 @@ services:
       - POSTGRES_DB_NAME=dev_test
       - POSTGRES_SCHEMA_NAME=public
     ports:
-      - "5432:5432"  # for debug
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  migrate:
+    image: arigaio/atlas:latest
+    # TODO unHARDCODE
+    command: >
+      migrate apply --url "postgresql://dev_user:123456@postgres:5432/dev_test?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src/consumer/migrations/:/migrations
 
   master:
     build:
@@ -136,7 +153,6 @@ services:
       - ./.env
     volumes:
       - ./build/producer:/app
-      - ./.env:/app
     ports:
       - "3000:3000"
 

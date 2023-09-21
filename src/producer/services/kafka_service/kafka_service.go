@@ -2,6 +2,7 @@ package kafka_service
 
 import (
 	"context"
+	"log"
 	"producer/config"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 type KafkaService struct {
 	writer *kafka.Writer
 	Config *config.Config
+	Logger *log.Logger
 }
 
 func (k *KafkaService) CreateConnection() {
@@ -27,10 +29,10 @@ func (k *KafkaService) CreateConnection() {
 		Topic:            k.Config.KafkaTopic,
 		Balancer:         &kafka.CRC32Balancer{},
 		Dialer:           dialer,
-		WriteTimeout:     10 * time.Second,
-		ReadTimeout:      10 * time.Second,
 		CompressionCodec: snappy.NewCompressionCodec(),
-		BatchSize:        k.Config.BatchSize / 4,
+		BatchSize:        k.Config.BatchSize,
+		BatchTimeout:     10 * time.Second,
+		Logger:           k.Logger,
 	}
 	w := kafka.NewWriter(config)
 	if w != nil {
@@ -38,13 +40,13 @@ func (k *KafkaService) CreateConnection() {
 	}
 }
 
-func (k *KafkaService) Push(message kafka.Message, ctx context.Context) error {
+func (k *KafkaService) Push(messages []kafka.Message, ctx context.Context) error {
 	if k.writer == nil {
 		k.CreateConnection()
 	}
 	err := k.writer.WriteMessages(
 		ctx,
-		message,
+		messages...,
 	)
 	return err
 }
