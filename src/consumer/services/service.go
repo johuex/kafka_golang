@@ -49,13 +49,12 @@ func (s *Service) Consume(wg *sync.WaitGroup) {
 		orms := s.convertToOrm(kafka_messages)
 
 		// write batch to repo
-		trans_result := s.TransactionRepository.InsertTransactions(orms)
-		for _, res := range trans_result {
-			if res.Error != nil {
-				s.Logger.Fatal("error while inserting to DB")
-			}
+		err := s.TransactionRepository.InsertTransactions(orms)
+		if err != nil {
+			s.Logger.Fatal("error while insert to DB " + err.Error())
 		}
-		err := r.CommitMessages(ctx, kafka_messages...)
+
+		err = r.CommitMessages(ctx, kafka_messages...)
 		if err != nil {
 			s.Logger.Fatal("error while commiting kafka messages " + err.Error())
 		}

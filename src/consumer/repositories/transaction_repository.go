@@ -25,8 +25,16 @@ type TransactionDB struct {
 	Accepted        bool
 }
 
-func (t *TransactionRepository) InsertTransactions(transactions []TransactionDB) []*gorm.DB {
-	insert_result := t.DBConn.Create(&transactions)
-	//commit_result := t.DBConn.Commit()
-	return []*gorm.DB{insert_result} //, commit_result}
+func (t *TransactionRepository) InsertTransactions(transactions []TransactionDB) error {
+	tx := t.DBConn.Begin()
+	if err := tx.Create(&transactions).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	return nil
+
 }

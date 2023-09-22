@@ -20,7 +20,6 @@ require (
 )
 
 require (
-	github.com/akyoto/uuid v1.1.3
 	github.com/gofiber/fiber/v2 v2.49.1
 	github.com/joho/godotenv v1.5.1
 	github.com/klauspost/compress v1.16.7 // indirect

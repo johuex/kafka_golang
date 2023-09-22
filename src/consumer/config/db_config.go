@@ -3,22 +3,24 @@ package config
 import "fmt"
 
 type DBConfig struct {
-	Host     string
-	User     string
-	DBName   string
-	Password string
-	SSLMode  string
-	Port     int
+	Host       string
+	User       string
+	DBName     string
+	Password   string
+	SSLMode    string
+	Port       int
+	AutoCommit bool
 }
 
 func NewDBConfig() *DBConfig {
 	return &DBConfig{
-		Host:     getEnv("DB_HOST", "localhost"),
-		User:     getEnv("DB_USER", "dev_user"),
-		DBName:   getEnv("DB_NAME", "dev_test"),
-		Password: getEnv("DB_PASSWD", "123456"),
-		Port:     getEnvInt("DB_PORT", 5432),
-		SSLMode:  getEnv("DB_SSL", "disable"),
+		Host:       getEnv("DB_HOST", "localhost"),
+		User:       getEnv("DB_USER", "dev_user"),
+		DBName:     getEnv("DB_NAME", "dev_test"),
+		Password:   getEnv("DB_PASSWD", "123456"),
+		Port:       getEnvInt("DB_PORT", 5432),
+		SSLMode:    getEnv("DB_SSL", "disable"),
+		AutoCommit: getEnvBool("DB_AUTOCOMMIT", false),
 	}
 }
 
