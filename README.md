@@ -30,5 +30,5 @@ Learning project for learning to use kafka with golang in highload examples.
 * PostgreSQL
 
 # TODO
-- [x] adapt to mapreduce in consumer
-- [x] union general code in external library
+- [] adapt to mapreduce in consumer
+- [] union general code in external library
